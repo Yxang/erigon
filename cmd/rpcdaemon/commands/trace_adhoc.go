@@ -521,6 +521,25 @@ func (ot *OeTracer) CaptureState(env *vm.EVM, pc uint64, op vm.OpCode, gas, cost
 		case vm.SSTORE:
 			ot.lastVmOp.Ex.Store = &VmTraceStore{Key: st.Back(0).String(), Val: st.Back(1).String()}
 		}
+		switch {
+		case op >= vm.LOG0 && op <= vm.LOG4:
+			// get stack as topics
+			var showStack = int(ot.lastOp-vm.LOG0) + 2
+			for i := showStack - 1; i >= 0; i-- {
+				ot.lastVmOp.Ex.Push = append(ot.lastVmOp.Ex.Push, st.Back(i).String())
+			}
+			// get memory as data
+			var lastMemOff = st.Back(0).Uint64()
+			var lastMemLen = st.Back(1).Uint64()
+			if memory != nil && memory.Len() > int(lastMemLen) {
+				cpy := memory.GetCopy(lastMemOff, lastMemLen)
+				if len(cpy) == 0 {
+					cpy = make([]byte, lastMemLen)
+				}
+				ot.lastVmOp.Ex.Mem = &VmTraceMem{Data: fmt.Sprintf("0x%0x", cpy), Off: int(lastMemOff)}
+			}
+
+		}
 		if ot.lastVmOp.Ex.Used < 0 {
 			ot.lastVmOp.Ex = nil
 		}
